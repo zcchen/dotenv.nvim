@@ -24,36 +24,26 @@ local function notify(msg, level)
 end
 
 local function read_file(path)
-  local fd = assert(uv.fs_open(path, "r", 438))
-  local stat = assert(uv.fs_fstat(fd))
-  local data = assert(uv.fs_read(fd, stat.size, 0))
-  assert(uv.fs_close(fd))
+  local fd = assert(vim.uv.fs_open(path, "r", tonumber('666', 8)))
+  local stat = assert(vim.uv.fs_fstat(fd))
+  local data = assert(vim.uv.fs_read(fd, stat.size, 0))
+  assert(vim.uv.fs_close(fd))
   return data
 end
 
 local function parse_data(data)
-  local values = vim.split(data, "\n")
   local out = {}
-  for _, pair in pairs(values) do
-    pair = vim.trim(pair)
-    if not vim.startswith(pair, "#") and pair ~= "" then
-      local splitted = vim.split(pair, "=")
-      if #splitted > 1 then
-        local key = splitted[1]
-        local v = {}
-        for i = 2, #splitted, 1 do
-          local k = vim.trim(splitted[i])
-          if k ~= "" then
-            table.insert(v, splitted[i])
-          end
-        end
-        if #v > 0 then
-          local value = table.concat(v, "=")
-          value, _ = string.gsub(value, '"', "")
-          vim.env[key] = value
-          out[key] = value
-        end
-      end
+  local notify_msg = ""
+  for line in string.gmatch(data, "[^\r\n]+") do
+    local l = vim.trim(line)
+    notify_msg = string.format(">>> raw line: <%s>", l)
+    notify(notify_msg)
+    if not vim.startswith(l, "#") and l ~= "" then
+      -- filter-out the comment line nor empty line
+      local k, v = string.match(l, '^([%w_]+)%s*=%s*(.*)$')
+      notify_msg = string.format(">>> found key: <%s>, value: <%s>", k, v)
+      notify(notify_msg)
+      out[k] = v
     end
   end
   return out
@@ -78,7 +68,10 @@ local function load(file)
     return
   end
 
-  parse_data(data)
+  local env = parse_data(data)
+  for k, v in pairs(env) do
+    vim.fn.setenv(k, v)
+  end
   notify(".env file loaded")
 end
 
