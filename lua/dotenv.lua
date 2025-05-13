@@ -61,17 +61,21 @@ local function parse_data(data)
         if not varname then                -- varname is invalid, return {}
           return {}
         end
-        local is_varname_defined = false
+        local is_varname_in_envfile = false
         for kk, vv in pairs(out) do
           if varname == kk then -- found the defined varname
             out[k] = vv
-            is_varname_defined = true
+            is_varname_in_envfile = true
             break
           end
         end
-        if not is_varname_defined then
-          msg = string.format("var '%s' is NOT defined before, skip to modify env '%s'", v, k)
-          notify(msg, "WARN")
+        if not is_varname_in_envfile then
+          if vim.env[varname] ~= nil then
+            out[k] = vim.env[varname]
+          else
+            msg = string.format("var '%s' is NOT defined in this envfile nor environment, skip to modify env '%s'", v, k)
+            notify(msg, "WARN")
+          end
         end
       end
     end
@@ -126,7 +130,7 @@ dotenv.setup = function(args)
   )
   vim.api.nvim_create_user_command("DotenvGet",
     function(opts)
-      dotenv.get(opts.fargs)
+      dotenv.get(opts.fargs[1])
     end,
     { nargs = 1 }
   )
